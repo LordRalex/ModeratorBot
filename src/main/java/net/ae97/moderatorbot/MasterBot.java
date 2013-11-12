@@ -34,10 +34,12 @@ public class MasterBot {
         channel = mainChan;
     }
 
-    public void connect(String server, int port, String nick, String pass, String[] channels) throws IrcException, IOException {
+    public void connect(String server, int port, String nick, String pass) throws IrcException, IOException {
         driver.setName(nick);
         driver.connect(server, port);
-        driver.identify(pass);
+        if (pass != null && !pass.isEmpty()) {
+            driver.identify(pass);
+        }
         driver.joinChannel(channel);
     }
 

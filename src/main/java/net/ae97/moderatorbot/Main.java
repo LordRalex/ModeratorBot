@@ -16,12 +16,50 @@
  */
 package net.ae97.moderatorbot;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+import javax.mail.MessagingException;
+import org.pircbotx.exception.IrcException;
+
 /**
  * @version 1.0
  * @author Lord_Ralex
  */
 public class Main {
 
-    public static void main(String args) {
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public static void main(String[] args) throws IrcException, IOException, MessagingException {
+        HashMap<String, String> parameters = new HashMap<>();
+        parameters.put("nick", "MCFTopic");
+        parameters.put("channel", "#mcftopicbot");
+        parameters.put("server", "irc.esper.net");
+        parameters.put("port", "6667");
+        parameters.put("pass", null);
+        if (args.length == 0) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(new File("config.cfg")))) {
+                String[] lines = (String[]) reader.lines().toArray();
+                for (String line : lines) {
+                    String[] parts = line.split("=");
+                    if (parts.length != 2) {
+                        continue;
+                    }
+                    parameters.put(parts[0], parts[1]);
+                }
+            } catch (IOException ex) {
+                ex.printStackTrace(System.err);
+            }
+        }
+        MasterBot masterBot = new MasterBot(parameters.get("channel"));
+        masterBot.connect(parameters.get("server"), Integer.parseInt(parameters.get("port")), parameters.get("nick"), parameters.get("pass"));
+        MailHandler handler = new MailHandler(masterBot);
+        executorService.scheduleWithFixedDelay(handler, 50, 50, TimeUnit.MILLISECONDS);
     }
 }

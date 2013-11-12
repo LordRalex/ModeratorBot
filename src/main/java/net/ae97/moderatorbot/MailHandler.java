@@ -36,14 +36,15 @@ import javax.mail.search.FlagTerm;
  * @version 1.0
  * @author Lord_Ralex
  */
-public class MailHandler implements Runnable {
+public final class MailHandler implements Runnable {
 
-    protected final MasterBot driver;
-    protected final Session session;
-    protected final Store store;
+    private final MasterBot driver;
+    private final Session session;
+    private final Store store;
     private final MessagePattern pattern;
+    private final Folder inbox;
 
-    public MailHandler(MasterBot d) {
+    public MailHandler(MasterBot d) throws MessagingException {
         driver = d;
         session = Session.getDefaultInstance(System.getProperties(), null);
         Store temp;
@@ -55,16 +56,16 @@ public class MailHandler implements Runnable {
         }
         store = temp;
         pattern = new MessagePattern(0, "", "");
+        store.connect("localhost", "username", "password");
+        inbox = store.getFolder("Inbox");
+        inbox.open(Folder.READ_WRITE);
     }
 
     @Override
     public void run() {
         try {
             Set<String> map = new HashSet<>();
-            synchronized (store) {
-                store.connect("localhost", "username", "password");
-                Folder inbox = store.getFolder("Inbox");
-                inbox.open(Folder.READ_WRITE);
+            synchronized (inbox) {
                 Message[] messages = inbox.search(new FlagTerm(new Flags(Flag.SEEN), false));
                 for (Message message : messages) {
                     Address[] from = message.getFrom();
