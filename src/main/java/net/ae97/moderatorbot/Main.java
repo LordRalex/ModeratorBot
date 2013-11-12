@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import javax.mail.MessagingException;
 import org.pircbotx.exception.IrcException;
 
@@ -43,6 +42,11 @@ public class Main {
         parameters.put("server", "irc.esper.net");
         parameters.put("port", "6667");
         parameters.put("pass", null);
+        parameters.put("mailserver", "localhost");
+        parameters.put("mailuser", "username");
+        parameters.put("mailpass", "password");
+        parameters.put("prefix", "http://");
+        parameters.put("suffix", "unread");
         if (args.length == 0) {
             try (BufferedReader reader = new BufferedReader(new FileReader(new File("config.cfg")))) {
                 String[] lines = (String[]) reader.lines().toArray();
@@ -59,7 +63,7 @@ public class Main {
         }
         MasterBot masterBot = new MasterBot(parameters.get("channel"));
         masterBot.connect(parameters.get("server"), Integer.parseInt(parameters.get("port")), parameters.get("nick"), parameters.get("pass"));
-        MailHandler handler = new MailHandler(masterBot);
+        MailHandler handler = new MailHandler(masterBot, parameters.get("mailserver"), parameters.get("mailuser"), parameters.get("mailpass"), parameters.get("prefix"), parameters.get("suffix"));
         executorService.scheduleWithFixedDelay(handler, 50, 50, TimeUnit.MILLISECONDS);
     }
 }

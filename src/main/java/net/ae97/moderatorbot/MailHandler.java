@@ -44,7 +44,7 @@ public final class MailHandler implements Runnable {
     private final MessagePattern pattern;
     private final Folder inbox;
 
-    public MailHandler(MasterBot d) throws MessagingException {
+    public MailHandler(MasterBot d, String server, String user, String pass, String prefix, String suffix) throws MessagingException {
         driver = d;
         session = Session.getDefaultInstance(System.getProperties(), null);
         Store temp;
@@ -55,8 +55,8 @@ public final class MailHandler implements Runnable {
             temp = null;
         }
         store = temp;
-        pattern = new MessagePattern(0, "", "");
-        store.connect("localhost", "username", "password");
+        pattern = new MessagePattern(prefix, suffix);
+        store.connect(server, user, pass);
         inbox = store.getFolder("Inbox");
         inbox.open(Folder.READ_WRITE);
     }
@@ -128,26 +128,23 @@ public final class MailHandler implements Runnable {
 
     private class MessagePattern {
 
-        private final int linesDown;
         private final String charsBefore;
         private final String charsAfter;
 
-        public MessagePattern(int buffer, String before, String after) {
-            linesDown = buffer;
+        public MessagePattern(String before, String after) {
             charsBefore = before;
             charsAfter = after;
         }
 
         public String getResult(String[] message) {
-            if (message.length < linesDown) {
-                return null;
+            for (String line : message) {
+                if (!line.contains(charsBefore) && !line.contains(charsAfter)) {
+                    return null;
+                }
+                String part = line.substring(charsBefore.length());
+                return part.substring(0, part.length() - charsAfter.length());
             }
-            String line = message[linesDown];
-            if (!line.contains(charsBefore) && !line.contains(charsAfter)) {
-                return null;
-            }
-            String part = line.substring(charsBefore.length());
-            return part.substring(0, part.length() - charsAfter.length());
+            return null;
         }
 
     }
