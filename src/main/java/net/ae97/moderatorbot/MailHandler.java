@@ -1,7 +1,23 @@
+/*
+ * Copyright (C) 2013 Lord_Ralex
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package net.ae97.moderatorbot;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.mail.Address;
@@ -15,36 +31,37 @@ import javax.mail.Session;
 import javax.mail.Store;
 import javax.mail.internet.InternetAddress;
 import javax.mail.search.FlagTerm;
-import org.pircbotx.PircBotX;
 
 /**
  * @version 1.0
- * @author Laptop
+ * @author Lord_Ralex
  */
-public class MailHandler extends Thread {
+public class MailHandler implements Runnable {
 
-    protected final PircBotX driver;
-    protected Session session;
-    protected Store store;
-    protected Map<String, MCF> map = new ConcurrentHashMap<String, MCF>();
+    protected final MasterBot driver;
+    protected final Session session;
+    protected final Store store;
+    private final MessagePattern pattern;
 
-    public MailHandler(PircBotX d) {
-        super();
-        this.setName("Mail_Thread_" + this.getName());
+    public MailHandler(MasterBot d) {
         driver = d;
         session = Session.getDefaultInstance(System.getProperties(), null);
+        Store temp;
         try {
-            store = session.getStore("imap");
+            temp = session.getStore("imap");
         } catch (NoSuchProviderException ex) {
             Logger.getLogger(MailHandler.class.getName()).log(Level.SEVERE, null, ex);
+            temp = null;
         }
+        store = temp;
+        pattern = new MessagePattern(0, "", "");
     }
 
     @Override
     public void run() {
-        String relayChannel = "";
-        while (driver.getChannelsNames().contains(relayChannel)) {
-            try {
+        try {
+            Set<String> map = new HashSet<>();
+            synchronized (store) {
                 store.connect("localhost", "username", "password");
                 Folder inbox = store.getFolder("Inbox");
                 inbox.open(Folder.READ_WRITE);
@@ -57,25 +74,41 @@ public class MailHandler extends Thread {
                     }
                     switch (Sender.getSender(sender)) {
                         case CURSE: {
+                            String topicLink;
+                            synchronized (pattern) {
+                                topicLink = pattern.getResult(message.getSubject().split("/n"));
+                            }
+                            if (topicLink != null) {
+                                map.add(topicLink);
+                            }
                         }
                         break;
                         case VIRUSTOTAL: {
                         }
                         break;
                     }
+                    message.setFlag(Flag.SEEN, true);
+                    message.setFlag(Flag.DELETED, true);
                 }
-            } catch (MessagingException ex) {
-                Logger.getLogger(MailHandler.class.getName()).log(Level.SEVERE, null, ex);
             }
-
+            if (map.isEmpty()) {
+                return;
+            }
+            for (String entry : map) {
+                driver.sendMessage("New topic posted: " + entry);
+            }
+            map.clear();
+        } catch (MessagingException ex) {
+            Logger.getLogger(MailHandler.class.getName()).log(Level.SEVERE, "A mail error occurred:", ex);
         }
+
     }
 
     private enum Sender {
 
         CURSE("noreply@curse.com"),
         VIRUSTOTAL("scan@virustotal.com"),
-        NONE("None");
+        NONE("");
         private final String email;
 
         private Sender(String e) {
@@ -90,5 +123,31 @@ public class MailHandler extends Thread {
             }
             return NONE;
         }
+    }
+
+    private class MessagePattern {
+
+        private final int linesDown;
+        private final String charsBefore;
+        private final String charsAfter;
+
+        public MessagePattern(int buffer, String before, String after) {
+            linesDown = buffer;
+            charsBefore = before;
+            charsAfter = after;
+        }
+
+        public String getResult(String[] message) {
+            if (message.length < linesDown) {
+                return null;
+            }
+            String line = message[linesDown];
+            if (!line.contains(charsBefore) && !line.contains(charsAfter)) {
+                return null;
+            }
+            String part = line.substring(charsBefore.length());
+            return part.substring(0, part.length() - charsAfter.length());
+        }
+
     }
 }
